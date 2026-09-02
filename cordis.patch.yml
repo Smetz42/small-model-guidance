@@ -1,0 +1,8 @@
+# small-model-guidance bundle patch.
+# Operator-scoped mounting: apply this bundle only to profiles whose tool
+# contract the shipped guidance states truthfully (code-mode profiles).
+# Guidance content is authored through the plugin's Config schema
+# (includeBaseline, bindings); this patch only mounts the plugin.
+- insert:
+    - id: small-model-guidance
+      name: 'small-model-guidance'
