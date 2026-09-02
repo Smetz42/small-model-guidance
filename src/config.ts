@@ -10,8 +10,8 @@ export interface GuidanceBinding {
   text: string;
 }
 
-/** Plugin configuration: operator-authored bindings; the baseline ships separately. */
-export interface GuidanceConfig {
+/** Plugin configuration: operator-authored guidance bindings. */
+export interface Config {
   bindings: GuidanceBinding[];
 }
 
@@ -22,7 +22,7 @@ const BindingSchema = z.object({
 });
 
 /** Structural schema for operator configuration; semantic checks live in {@link parseGuidanceConfig}. */
-export const GuidanceConfigSchema: Schemastery.Schema<GuidanceConfig> = z.object({
+export const Config: z<Config> = z.object({
   bindings: z.array(BindingSchema).default([]),
 });
 
@@ -32,10 +32,10 @@ export const GuidanceConfigSchema: Schemastery.Schema<GuidanceConfig> = z.object
  * list, empty text) throw naming the offending binding. Both fail loud at
  * plugin load.
  */
-export function parseGuidanceConfig(input: unknown): GuidanceConfig {
+export function parseGuidanceConfig(input: unknown): Config {
   // Schema instances are callable resolvers; the declared input type narrows to
   // the validated shape, but this boundary takes unvalidated operator config.
-  const validate = GuidanceConfigSchema as unknown as (data: unknown) => GuidanceConfig;
+  const validate = Config as unknown as (data: unknown) => Config;
   const value = validate(input);
   value.bindings.forEach((binding, i) => {
     if (binding.models.length === 0) throw new Error(`bindings[${i}]: models must list at least one model id`);
