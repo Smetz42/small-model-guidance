@@ -62,6 +62,8 @@ describe('baseline binding', () => {
       'silently dead turn',
       'lossless JSON',
       'try/catch',
+      'require a description argument in their args',
+      'missing required property "description"',
       'curate output',
       're-issue the identical work once as a run_code program',
       'await tools.<name>(args)',

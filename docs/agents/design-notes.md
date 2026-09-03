@@ -20,6 +20,17 @@ The two listeners share one registration `WeakMap`: section names are unique
 per scope, so two listeners with independent bookkeeping would race duplicate
 registrations and throw.
 
+## Why the baseline names the per-call description requirement
+
+Inside a run_code program, several called tools (bash, edit, workflow, the
+subagent surfaces) reject without a `description` argument
+(`invalid arguments: missing required property "description"`), while others
+(read, write, glob, grep) accept its absence. Models repeatedly read the
+error as a harness fault and retry identical args, so the baseline states
+the requirement, names the tools, and gives the recovery: re-issue the same
+call with the description added. Verified empirically on dsh 0.1.1-rc.2
+(bash/write probe) before wording the rule.
+
 ## Why the additive baseline (ADR-0001 recap)
 
 A fresh install must have proven value without authoring: `includeBaseline`
