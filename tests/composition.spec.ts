@@ -124,4 +124,39 @@ describe('small-model-guidance composition', () => {
       await ctx.fiber.dispose();
     }
   });
+
+  it('injects all matching bindings in listed order and collapses identical text', async () => {
+    const adapter = new ScriptedAdapter([textResponse('multi')]);
+    const ctx = new Context();
+    await ctx.plugin(LlmRuntime);
+    await ctx.plugin(SessionStore);
+    await ctx.plugin(SystemPrompt);
+    await ctx.plugin(AgentRegistry);
+    await ctx.plugin(ToolRuntime);
+    await ctx.plugin(smallModelGuidance, {
+      bindings: [
+        { models: ['qwen3.8-27b'], text: 'MULTI_ONE' },
+        { models: ['qwen3.8-27b'], text: 'MULTI_TWO' },
+        { models: ['qwen3.8-27b'], text: 'MULTI_ONE' },
+      ],
+    });
+    await ctx.plugin(AgentLoop, { agents: [] });
+    ctx.llm.registerAdapter(['mock'], adapter);
+    try {
+      const agentLoop = ctx.get('agentLoop') as InstanceType<typeof AgentLoop>;
+      const agent = agentLoop.create(SessionId('smg-multi'), { provider: 'mock', model: 'qwen3.8-27b' }, { cwd: process.cwd() });
+
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }));
+      await agent.whenIdle();
+
+      expect(adapter.requests).toHaveLength(1);
+      const prompt = rendered(adapter.requests[0]);
+      expect(prompt.indexOf('MULTI_ONE')).toBeGreaterThanOrEqual(0);
+      expect(prompt.indexOf('MULTI_TWO')).toBeGreaterThan(prompt.indexOf('MULTI_ONE'));
+      expect(prompt.split('MULTI_ONE')).toHaveLength(2); // collapsed: exactly one occurrence
+      expect(prompt).toMatchSnapshot();
+    } finally {
+      await ctx.fiber.dispose();
+    }
+  });
 });

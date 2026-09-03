@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createAgentCreatedHandler, createPreStepHandler, GUIDANCE_ORDER } from '../src/index.js';
+import { createAgentCreatedHandler, createPreStepHandler, desiredSections, GUIDANCE_ORDER } from '../src/index.js';
 import type { GuidanceBinding } from '../src/config.js';
 
 interface FakeAgent {
@@ -65,12 +65,12 @@ describe('pre-step guidance handler', () => {
     const { agent, sections } = fakeAgent('gumdrop', 'qwen3.8-27b');
     const handler = createPreStepHandler([
       { models: ['qwen3.8-27b'], text: 'OLD' },
-      { models: ['deepseek-chat'], text: 'NEW' },
+      { models: ['deepseek-chat'], text: 'ONLY' },
     ]);
     await step(handler, agent);
     agent.options.model = 'deepseek-chat';
     await step(handler, agent);
-    expect(sections).toEqual([{ name: 'small-model-guidance', order: GUIDANCE_ORDER, text: 'NEW' }]);
+    expect(sections).toEqual([{ name: 'small-model-guidance', order: GUIDANCE_ORDER, text: 'ONLY' }]);
   });
 
   it('disposes the section when the agent stops matching', async () => {
@@ -117,5 +117,62 @@ describe('agent/created guidance handler', () => {
     createAgentCreatedHandler(bindings, registered)({ agent });
     await step(createPreStepHandler(bindings, registered), agent);
     expect(sections).toHaveLength(1);
+  });
+});
+describe('multi-binding semantics', () => {
+  const multi = [
+    { models: ['qwen3.8-27b'], text: 'FIRST' },
+    { models: ['qwen3.8-27b'], text: 'SECOND' },
+    { models: ['deepseek-chat'], text: 'ONLY' },
+  ];
+
+  it('injects every matching binding in listed order', () => {
+    const { agent, sections } = fakeAgent('gumdrop', 'qwen3.8-27b');
+    createAgentCreatedHandler(multi)({ agent });
+    expect(sections).toEqual([
+      { name: 'small-model-guidance', order: GUIDANCE_ORDER, text: 'FIRST' },
+      { name: 'small-model-guidance:2', order: GUIDANCE_ORDER, text: 'SECOND' },
+    ]);
+  });
+
+  it('collapses byte-identical resolved text to one section', () => {
+    const { agent, sections } = fakeAgent('gumdrop', 'qwen3.8-27b');
+    createAgentCreatedHandler([...multi, { models: ['qwen3.8-27b'], text: 'FIRST' }])({ agent });
+    expect(sections).toEqual([
+      { name: 'small-model-guidance', order: GUIDANCE_ORDER, text: 'FIRST' },
+      { name: 'small-model-guidance:2', order: GUIDANCE_ORDER, text: 'SECOND' },
+    ]);
+  });
+
+  it('replaces the whole section set when the match set changes names', async () => {
+    const { agent, sections } = fakeAgent('gumdrop', 'qwen3.8-27b');
+    const handler = createPreStepHandler(multi);
+    await step(handler, agent);
+    agent.options.model = 'deepseek-chat';
+    await step(handler, agent);
+    expect(sections).toEqual([{ name: 'small-model-guidance', order: GUIDANCE_ORDER, text: 'ONLY' }]);
+  });
+});
+
+describe('desiredSections resolution', () => {
+  it('resolves no sections when identity is missing', () => {
+    expect(desiredSections([{ models: ['qwen3.8-27b'], text: 'X' }], undefined, 'qwen3.8-27b')).toEqual([]);
+    expect(desiredSections([{ models: ['qwen3.8-27b'], text: 'X' }], 'gumdrop', undefined)).toEqual([]);
+  });
+
+  it('numbers multiple sections in listed order', () => {
+    const desired = desiredSections(
+      [
+        { models: ['qwen3.8-27b'], text: 'A' },
+        { models: ['deepseek-chat'], text: 'B' },
+        { models: ['qwen3.8-27b'], text: 'C' },
+      ],
+      'gumdrop',
+      'qwen3.8-27b',
+    );
+    expect(desired).toEqual([
+      { name: 'small-model-guidance', text: 'A' },
+      { name: 'small-model-guidance:2', text: 'C' },
+    ]);
   });
 });

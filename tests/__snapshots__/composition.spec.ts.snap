@@ -19,3 +19,12 @@ one
 turn two",
 ]
 `;
+
+exports[`small-model-guidance composition > injects all matching bindings in listed order and collapses identical text 1`] = `
+"You are an AI agent powered by DeepSeek Harness.
+
+MULTI_ONE
+
+MULTI_TWO
+go"
+`;
