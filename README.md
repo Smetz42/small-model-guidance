@@ -7,10 +7,16 @@ Model-scoped guidance sections for the DeepSeek Harness system prompt — a stan
 ## Install
 
 ```
-dsh plugin --profile <name> add small-model-guidance
+dsh plugin --profile <name> add Smetz42/small-model-guidance
 ```
 
-Zero config works: the shipped baseline binding injects the qwen3.8-27b run_code tool-call protocol guidance (see `src/config.ts` `BASELINE_TEXT`, pinned verbatim by tests). npm publishing is a deliberate later act; until then the bundle installs from the GitHub remote.
+Verified against the real install path (dsh 0.1.1-rc.2, pnpm 11.7):
+
+1. The CLI initializes the profile on first use and forwards to pnpm in the profile directory.
+2. A git-hosted bundle builds on install through its `prepare` script; pnpm blocks that build until the package is allowlisted. Follow the exact `allowBuilds` key pnpm prints: add it under `allowBuilds` in the profile's `pnpm-workspace.yaml`, then re-run the add.
+3. The CLI reconciles the profile's `dsh.profile.bundles` layer list, and the installed bundle's `cordis.patch.yml` mounts the plugin.
+
+Zero config then works: the shipped baseline binding injects the qwen3.8-27b run_code tool-call protocol guidance (see `src/config.ts` `BASELINE_TEXT`, pinned verbatim by tests). npm publishing stays a deliberate later act; once published, `dsh plugin --profile <name> add small-model-guidance` resolves from the registry.
 
 ## Model experience
 
