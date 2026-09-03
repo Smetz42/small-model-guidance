@@ -7,6 +7,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools';
 import AgentLoop from '@deepseek-ai/dsh-agent-loop';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import * as smallModelGuidance from '../src/index.js';
+import { BASELINE_TEXT } from '../src/config.js';
 import { ScriptedAdapter, textResponse } from './scripted-adapter.js';
 
 const GUIDANCE_TEXT = 'Never emit a tool-call block as message text; issue tool calls only through the run_code program channel.';
@@ -154,6 +155,92 @@ describe('small-model-guidance composition', () => {
       expect(prompt.indexOf('MULTI_ONE')).toBeGreaterThanOrEqual(0);
       expect(prompt.indexOf('MULTI_TWO')).toBeGreaterThan(prompt.indexOf('MULTI_ONE'));
       expect(prompt.split('MULTI_ONE')).toHaveLength(2); // collapsed: exactly one occurrence
+      expect(prompt).toMatchSnapshot();
+    } finally {
+      await ctx.fiber.dispose();
+    }
+  });
+
+  it('injects the baseline for a zero-config install and pins it verbatim', async () => {
+    const adapter = new ScriptedAdapter([textResponse('base')]);
+    const ctx = new Context();
+    await ctx.plugin(LlmRuntime);
+    await ctx.plugin(SessionStore);
+    await ctx.plugin(SystemPrompt);
+    await ctx.plugin(AgentRegistry);
+    await ctx.plugin(ToolRuntime);
+    await ctx.plugin(smallModelGuidance, {});
+    await ctx.plugin(AgentLoop, { agents: [] });
+    ctx.llm.registerAdapter(['mock'], adapter);
+    try {
+      const agentLoop = ctx.get('agentLoop') as InstanceType<typeof AgentLoop>;
+      const agent = agentLoop.create(SessionId('smg-baseline'), { provider: 'mock', model: 'qwen3.8-27b' }, { cwd: process.cwd() });
+
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }));
+      await agent.whenIdle();
+
+      expect(adapter.requests).toHaveLength(1);
+      const prompt = rendered(adapter.requests[0]);
+      expect(prompt).toContain(BASELINE_TEXT);
+      expect(prompt.split(BASELINE_TEXT)).toHaveLength(2);
+      expect(prompt).toMatchSnapshot();
+    } finally {
+      await ctx.fiber.dispose();
+    }
+  });
+
+  it('drops the baseline on includeBaseline: false while user bindings keep working', async () => {
+    const adapter = new ScriptedAdapter([textResponse('user')]);
+    const ctx = new Context();
+    await ctx.plugin(LlmRuntime);
+    await ctx.plugin(SessionStore);
+    await ctx.plugin(SystemPrompt);
+    await ctx.plugin(AgentRegistry);
+    await ctx.plugin(ToolRuntime);
+    await ctx.plugin(smallModelGuidance, { includeBaseline: false, bindings: [{ models: ['qwen3.8-27b'], text: 'USER_GUIDANCE' }] });
+    await ctx.plugin(AgentLoop, { agents: [] });
+    ctx.llm.registerAdapter(['mock'], adapter);
+    try {
+      const agentLoop = ctx.get('agentLoop') as InstanceType<typeof AgentLoop>;
+      const agent = agentLoop.create(SessionId('smg-nobaseline'), { provider: 'mock', model: 'qwen3.8-27b' }, { cwd: process.cwd() });
+
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }));
+      await agent.whenIdle();
+
+      expect(adapter.requests).toHaveLength(1);
+      const prompt = rendered(adapter.requests[0]);
+      expect(prompt).toContain('USER_GUIDANCE');
+      expect(prompt).not.toContain(BASELINE_TEXT);
+      expect(prompt).toMatchSnapshot();
+    } finally {
+      await ctx.fiber.dispose();
+    }
+  });
+
+  it('orders the baseline before user bindings and collapses a copied baseline', async () => {
+    const adapter = new ScriptedAdapter([textResponse('order')]);
+    const ctx = new Context();
+    await ctx.plugin(LlmRuntime);
+    await ctx.plugin(SessionStore);
+    await ctx.plugin(SystemPrompt);
+    await ctx.plugin(AgentRegistry);
+    await ctx.plugin(ToolRuntime);
+    await ctx.plugin(smallModelGuidance, {
+      bindings: [{ models: ['qwen3.8-27b'], text: BASELINE_TEXT }],
+    });
+    await ctx.plugin(AgentLoop, { agents: [] });
+    ctx.llm.registerAdapter(['mock'], adapter);
+    try {
+      const agentLoop = ctx.get('agentLoop') as InstanceType<typeof AgentLoop>;
+      const agent = agentLoop.create(SessionId('smg-copy'), { provider: 'mock', model: 'qwen3.8-27b' }, { cwd: process.cwd() });
+
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }));
+      await agent.whenIdle();
+
+      expect(adapter.requests).toHaveLength(1);
+      const prompt = rendered(adapter.requests[0]);
+      // Copying the baseline text into a user binding must not double-inject.
+      expect(prompt.split(BASELINE_TEXT)).toHaveLength(2);
       expect(prompt).toMatchSnapshot();
     } finally {
       await ctx.fiber.dispose();

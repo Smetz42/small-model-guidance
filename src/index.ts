@@ -4,7 +4,7 @@ import type { Context } from '@deepseek-ai/cordis';
 // agent/pre-step Events member) into the compiling program.
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { SystemPrompt } from '@deepseek-ai/dsh-system-prompt';
-import { Config, parseGuidanceConfig, type GuidanceBinding } from './config.js';
+import { Config, parseGuidanceConfig, resolveBindings, type GuidanceBinding } from './config.js';
 import { matchesBinding } from './match.js';
 
 /** Composition id; matches the bundle patch insert row and the base section name. */
@@ -139,7 +139,7 @@ export function createPreStepHandler<P extends { agent: GuidanceAgent }, D>(bind
  * section effects themselves unwind with each agent's scope.
  */
 export function apply(ctx: Context, config: Config): void {
-  const bindings = parseGuidanceConfig(config).bindings;
+  const bindings = resolveBindings(parseGuidanceConfig(config));
   const registered = new WeakMap<object, RegisteredSections>();
   ctx.on('agent/created', createAgentCreatedHandler(bindings, registered));
   ctx.on('agent/pre-step', createPreStepHandler(bindings, registered));
