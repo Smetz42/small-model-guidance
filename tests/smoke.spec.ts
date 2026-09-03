@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
-import { PLUGIN_ID } from '../src/index.js';
+import * as plugin from '../src/index.js';
 
-it('resolves the ESM entry and exposes the plugin id used by the bundle patch', () => {
-  expect(PLUGIN_ID).toBe('small-model-guidance');
+it('exports the function-plugin contract surface', () => {
+  expect(plugin.name).toBe('small-model-guidance');
+  expect(plugin.Config).toBeTypeOf('function'); // schemastery schemas are callable validators
+  expect(plugin.apply).toBeTypeOf('function');
+  expect(plugin.createPreStepHandler).toBeTypeOf('function');
+  expect(plugin.createAgentCreatedHandler).toBeTypeOf('function');
 });

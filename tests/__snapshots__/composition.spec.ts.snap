@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`small-model-guidance composition > contributes nothing for a non-matching model 1`] = `
+"You are an AI agent powered by DeepSeek Harness.
+hello"
+`;
+
+exports[`small-model-guidance composition > contributes the guidance section to a matching agent and keeps it stable across turns 1`] = `
+[
+  "You are an AI agent powered by DeepSeek Harness.
+
+Never emit a tool-call block as message text; issue tool calls only through the run_code program channel.
+turn one",
+  "You are an AI agent powered by DeepSeek Harness.
+
+Never emit a tool-call block as message text; issue tool calls only through the run_code program channel.
+turn one
+one
+turn two",
+]
+`;
